@@ -81,7 +81,7 @@ data_ = data.get_numpy(["col2"], {"key1": "val1"})
 print(data_)
 print("------------------------------------------")
 data.show(["col2"], {"key1": "val1"})
-data.filter(["col2"], {"key1": "val1"})
+data.filter(["col2"], {"key1": "val1", "key2": "val2"})
 data.show(["col2"], {"key1": "val1"})
 
 # We remove the csv file
