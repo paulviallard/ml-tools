@@ -350,8 +350,14 @@ class Writer(Lock):
                     return False
                 return True
 
+            def filter_path_list_path_dict(**kwargs):
+                for key in path_dict.keys():
+                    if(key in kwargs and kwargs[key] != path_dict[key]):
+                        return False
+                return True
+
             filter_data = filter_data_list_path_dict
-            filter_path = None
+            filter_path = filter_path_list_path_dict
 
         # We return the get
         get_dict = self.__get_(
