@@ -227,17 +227,13 @@ class LaunchConfig():
             new_known_param["${"+param+"}"] = str(known_param[param])
         known_var.update(new_known_param)
 
-        # We create two special variables: ${path} and ${params}
-        # ${path} contains a path containing the current hyperparams
+        # We create one special variable: ${params}
         # ${params} contains a list of params for the run
-        var_list["${path}"] = ""
         var_list["${params}"] = ""
         for arg_name in sorted(list(known_param)):
-            var_list["${path}"] += "{}={}/".format(
-                arg_name, known_param[arg_name])
             var_list["${params}"] += " --{}={}".format(
                 arg_name, known_param[arg_name])
-        var_list["${path}"] = var_list["${path}"][:-1]
+        var_list["${params}"] = var_list["${params}"][1:]
 
         # While the replacements are not stabilized
         terminated = False
@@ -274,8 +270,7 @@ class LaunchConfig():
             self._run(prog_subtree, prog_subtree[2], {}, {}, [])
 
     def _run(self, job_tree, param_list,
-             known_param, known_var, known_dependency
-             ):
+             known_param, known_var, known_dependency):
 
         # We keep the old parameters to check if there is a problem
         old_param_list = param_list
@@ -396,9 +391,11 @@ class LaunchConfig():
 
         # For each subtree (of type "[sth1 |-> sth2]")
         for job_subtree in job_tree[4]:
+
             # We run recursively the subtree (and we get the dependency)
             dependency_ = self._run(
-                job_subtree, job_subtree[2], {}, {}, dependency_1)
+                job_subtree, job_subtree[2],
+                known_param, known_var, dependency_1)
             # We add the new dependencies in the list
             dependency_2 = sorted(
                 list(set(dependency_2 + dependency_)),
