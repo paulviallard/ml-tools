@@ -359,6 +359,22 @@ class Writer(Lock):
             filter_data = filter_data_list_path_dict
             filter_path = filter_path_list_path_dict
 
+        # If we have a path dict but no list of datasets, this is a speicial
+        # case where the get all the datasets (that are filtered)
+        if(data_list is None and path_dict is not None):
+
+            def filter_data_list_path_dict(data, **kwargs):
+                return True
+
+            def filter_path_list_path_dict(**kwargs):
+                for key in path_dict.keys():
+                    if(key in kwargs and kwargs[key] != path_dict[key]):
+                        return False
+                return True
+
+            filter_data = filter_data_list_path_dict
+            filter_path = filter_path_list_path_dict
+
         # We return the get
         get_dict = self.__get_(
             self._data, filter_data=filter_data, filter_path=filter_path,
@@ -506,6 +522,22 @@ class Writer(Lock):
             filter_data = filter_data_list_path_dict
             filter_path = filter_path_list_path_dict
 
+        # If we have a path dict but no list of datasets, this is a speicial
+        # case where the get all the datasets (that are filtered)
+        if(data_list is None and path_dict is not None):
+
+            def filter_data_list_path_dict(data, **kwargs):
+                return False
+
+            def filter_path_list_path_dict(**kwargs):
+                for key in path_dict.keys():
+                    if(key in kwargs and kwargs[key] != path_dict[key]):
+                        return True
+                return False
+
+            filter_data = filter_data_list_path_dict
+            filter_path = filter_path_list_path_dict
+
         # We define the negation of the filters
         def neq_filter_data(*args, **kwargs):
             result = filter_data(*args, **kwargs)
@@ -626,6 +658,22 @@ class Writer(Lock):
                         return False
                 if(data not in data_list):
                     return False
+                return True
+
+            def filter_path_list_path_dict(**kwargs):
+                for key in path_dict.keys():
+                    if(key in kwargs and kwargs[key] != path_dict[key]):
+                        return False
+                return True
+
+            filter_data = filter_data_list_path_dict
+            filter_path = filter_path_list_path_dict
+
+        # If we have a path dict but no list of datasets, this is a speicial
+        # case where the get all the datasets (that are filtered)
+        if(data_list is None and path_dict is not None):
+
+            def filter_data_list_path_dict(data, **kwargs):
                 return True
 
             def filter_path_list_path_dict(**kwargs):
