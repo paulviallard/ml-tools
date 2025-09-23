@@ -306,7 +306,9 @@ class LaunchConfig():
 
                 # We update the known parameters before interpreting
                 # recursively
-                known_param_.update(known_param)
+                for key in known_param.keys():
+                    if key not in known_param_:
+                        known_param_[key] = known_param[key]
 
                 # We run recursively the algorithm with the interpreted
                 # parameters (to run the new loops ...)
