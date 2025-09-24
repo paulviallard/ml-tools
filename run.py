@@ -310,10 +310,16 @@ class LaunchConfig():
                     if key not in known_param_:
                         known_param_[key] = known_param[key]
 
+                # We remove the subtree of type "[sth1 |-> sth2]"
+                # (that will be launched in this recursion)
+                job_subtree = [
+                    job_tree[0], job_tree[1], job_tree[2],
+                    job_tree[3], [], job_tree[5]]
+
                 # We run recursively the algorithm with the interpreted
                 # parameters (to run the new loops ...)
                 self._run(
-                    job_tree, todo_param_list, known_param_,
+                    job_subtree, todo_param_list, known_param_,
                     known_var, known_dependency)
                 continue
 
