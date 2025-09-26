@@ -10,12 +10,14 @@ import itertools
 import argparse
 import configparser
 import subprocess
-import time
 import logging
 import glob
 
 # Useful packages in the .ini files
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    pass
 import math
 
 ###############################################################################
@@ -318,9 +320,16 @@ class LaunchConfig():
 
                 # We run recursively the algorithm with the interpreted
                 # parameters (to run the new loops ...)
-                self._run(
+                dependency_ = self._run(
                     job_subtree, todo_param_list, known_param_,
                     known_var, known_dependency)
+
+                # We add the dependencies of the recursion in the list
+                dependency_1 = sorted(
+                    list(set(dependency_1 + dependency_)),
+                    key=lambda x: int(x.split('_')[-1])
+                )
+
                 continue
 
             # We increase the run index
@@ -475,6 +484,7 @@ class SlurmLaunchConfig(LaunchConfig):
 
     def _run_command(self, command, run_name=None, job_list=None):
 
+        # We get all the job id on which our job depends
         new_job_list = []
         if(job_list is not None):
             for run_name_ in job_list:
@@ -483,7 +493,7 @@ class SlurmLaunchConfig(LaunchConfig):
                     new_job_list.append(job_id)
         job_list = new_job_list
 
-        # We get all the job id on which our job depends
+        # We create the option for the dependencies
         if(len(job_list) > 0):
             dependency = "--dependency=afterany:"
         else:
@@ -573,17 +583,21 @@ class OarLaunchConfig(LaunchConfig):
 
     def _run_command(self, command, run_name=None, job_list=None):
 
-        # NOTE: we can depend on only one job in OAR ...
-        # So we will always depend on the highest job id in the list ...
-        job_id = None
-        i = len(job_list)-1
-        while i >= 0 and job_id is None:
-            job_id = self.get_job_id(job_list[-1])
-            i -= 1
-        if job_id is not None:
-            dependency = "-a {}".format(job_id)
-        else:
-            dependency = ""
+        # We get all the job id on which our job depends
+        new_job_list = []
+        if(job_list is not None):
+            for run_name_ in job_list:
+                job_id = self.get_job_id(run_name_)
+                if(job_id is not None):
+                    new_job_list.append(job_id)
+        job_list = new_job_list
+
+        # We create the options for the dependencies
+        dependency = ""
+        for job_id in job_list:
+            if(job_id is not None):
+                dependency += "-a {} ".format(job_id)
+        dependency = dependency[:-1]
 
         # We get the default configuration file
         config_file_list = glob.glob("./run_oar_default*")
