@@ -161,7 +161,7 @@ class LaunchConfig():
                 exec("param_list['" + param_name + "'] = "
                      + param_list[param_name], globals(), known_param_)
 
-            except NameError:
+            except (NameError, TypeError):
                 # If we cannot interpret the param, we add the param in the
                 # todo list
                 todo_param_list[param_name] = param_list[param_name]
