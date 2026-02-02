@@ -49,7 +49,10 @@ class Lock():
         # creating an additional hard link (named with a .lock)
         try:
             os.link(self._path_file, self._lock_file)
-            self.__got_lock = True
+            if(os.stat(self._path_file).st_nlink == 2):
+                self.__got_lock = True
+            else:
+                self.__got_lock = False
         except FileExistsError:
             self.__got_lock = False
             return
