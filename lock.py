@@ -40,6 +40,7 @@ class Lock():
 
         # We create the file if it does not exist
         try:
+            os.makedirs(os.path.dirname(self._path_file), exist_ok=True)
             fd = os.open(self._path_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             os.close(fd)
         except FileExistsError:
