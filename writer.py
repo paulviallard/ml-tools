@@ -4,6 +4,7 @@
 # as published by Sam Hocevar. See http://www.wtfpl.net/ for more details.
 
 import io
+import os
 import re
 import h5py
 import numpy as np
