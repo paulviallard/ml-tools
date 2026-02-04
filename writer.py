@@ -14,9 +14,15 @@ import pandas as pd
 
 class Writer():
 
+    def __init__(self, file_):
+        # We save the path associated with the data
+        self._path_file = os.path.abspath(file_)
+
+    # ----------------------------------------------------------------------- #
+
     def _load(self):
         # We load the data
-        self._data = h5py.File(self._lock_file, "a")
+        self._data = h5py.File(self._path_file, "a")
 
     def _close(self):
         # We close the data
