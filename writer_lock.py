@@ -1,4 +1,4 @@
-# Copyright © 2026 Paul Viallard <paul.viallard@gmail.com>
+# Copyright © 2025 Paul Viallard <paul.viallard@gmail.com>
 # This work is free. You can redistribute it and/or modify it under the
 # terms of the Do What The Fuck You Want To Public License, Version 2,
 # as published by Sam Hocevar. See http://www.wtfpl.net/ for more details.
@@ -8,11 +8,12 @@ import re
 import h5py
 import numpy as np
 import pandas as pd
+from lock import Lock
 
 ###############################################################################
 
 
-class Writer():
+class Writer(Lock):
 
     def _load(self):
         # We load the data
@@ -25,6 +26,9 @@ class Writer():
     # ----------------------------------------------------------------------- #
 
     def set(self, data_dict, path_dict, mode="r"):
+        return self.do(self.__set, data_dict, path_dict, mode=mode)
+
+    def __set(self, data_dict, path_dict, mode="r"):
         # NOTE: Here is the different mode to save the data:
         # "w" -> erase existing data
         # "a" -> append the data to the existing one
@@ -278,8 +282,8 @@ class Writer():
         filter_data=None, filter_path=None
     ):
         # We get the path_dict and the data_dict
-        path_dict, data_dict = self.__get(
-            data_list=data_list, path_dict=path_dict,
+        path_dict, data_dict = self.do(
+            self.__get, data_list=data_list, path_dict=path_dict,
             filter_data=filter_data, filter_path=filter_path,
             all=True)
 
@@ -310,8 +314,8 @@ class Writer():
         info=False, all=False, squeeze=True
     ):
 
-        get_dict = self.__get(
-            data_list=data_list, path_dict=path_dict,
+        get_dict = self.do(
+            self.__get, data_list=data_list, path_dict=path_dict,
             filter_data=filter_data, filter_path=filter_path,
             info=info, all=all)
 
@@ -485,6 +489,14 @@ class Writer():
         self, data_list=None, path_dict=None,
         filter_data=None, filter_path=None
     ):
+        return self.do(
+            self.__filter, data_list=data_list, path_dict=path_dict,
+            filter_data=filter_data, filter_path=filter_path)
+
+    def __filter(
+        self, data_list=None, path_dict=None,
+        filter_data=None, filter_path=None,
+    ):
 
         # We load the data
         self._load()
@@ -602,8 +614,8 @@ class Writer():
         def filter_data(data, **kwargs):
             return True
 
-        path_dict, data_dict = self.__show(
-            filter_data=filter_data, filter_path=None)
+        path_dict, data_dict = self.do(
+            self.__show, filter_data=filter_data, filter_path=None)
 
         # We get the string that we need to show
         string = self.__show_(path_dict, data_dict, "")
@@ -614,8 +626,8 @@ class Writer():
         self, data_list=None, path_dict=None,
         filter_data=None, filter_path=None, to_print=True
     ):
-        path_dict, data_dict = self.__show(
-            data_list=data_list, path_dict=path_dict,
+        path_dict, data_dict = self.do(
+            self.__show, data_list=data_list, path_dict=path_dict,
             filter_data=filter_data, filter_path=filter_path)
 
         # We get the string that we need to show
