@@ -23,6 +23,7 @@ class Writer():
 
     def _load(self):
         # We load the data
+        os.makedirs(os.path.dirname(self._path_file), exist_ok=True)
         self._data = h5py.File(self._path_file, "a")
 
     def _close(self):
