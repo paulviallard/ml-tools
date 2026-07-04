@@ -19,6 +19,10 @@ The file *merge.py* merges several files created by *writer.py* (matching a glob
 
 The file *map_run_id.py* matches the runs of two *run.py* .ini files (by comparing their command and parameters) and runs a command for each matched pair, substituting `{input_run_id}`/`{output_run_id}`. This is useful, for instance, to rename result files after the .ini file was edited and the run_id changed.
 
+* **A script to find missing results (in _check_run_id.py_)**
+
+The file *check_run_id.py* reads a *run.py* .ini file and checks, for every run_id it describes, whether a result file matching a given pattern (e.g. `results/results_{run_id}.h5`) exists. It prints the run_id with no matching file as a comma-separated list, ready to be passed to `run.py`'s `--job` option to re-run only the missing ones.
+
 ### Running the examples
 
 ##### writer.py
@@ -64,4 +68,10 @@ To run the example, you need to execute the following command in your bash shell
 ```bash
 python map_run_id.py example/example_run.ini example/example_run_2.ini \
     "echo {input_run_id} -> {output_run_id}" --print
+```
+
+##### check_run_id.py
+To run the example, you need to execute the following command in your bash shell.
+```bash
+python check_run_id.py example/example_run.ini "results/results_{run_id}.h5"
 ```
