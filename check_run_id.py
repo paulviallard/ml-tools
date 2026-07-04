@@ -41,6 +41,29 @@ def get_missing_run_id_list(run_id_list, pattern):
     return missing_run_id_list
 
 
+def get_job_string(run_id_list):
+    # We compress the consecutive run_id into ranges, to build a string
+    # usable with run.py's --job option (e.g. "1,3,5:8")
+    run_id_list = sorted(run_id_list)
+
+    # We split the run_id into (start, end) ranges of consecutive values
+    range_list = []
+    for run_id in run_id_list:
+        if(len(range_list) > 0 and run_id == range_list[-1][1]+1):
+            range_list[-1][1] = run_id
+        else:
+            range_list.append([run_id, run_id])
+
+    # We turn each range into a string: a single run_id, or "start:end"
+    str_list = []
+    for start, end in range_list:
+        if(start == end):
+            str_list.append(str(start))
+        else:
+            str_list.append(f"{start}:{end}")
+    return ",".join(str_list)
+
+
 ###############################################################################
 
 
@@ -70,5 +93,6 @@ if __name__ == "__main__":
     missing_run_id_list = get_missing_run_id_list(
         run_id_list, arg_list.pattern)
 
-    # We print them as a comma-separated list, ready to be used with --job
-    logging.info(",".join(str(run_id) for run_id in missing_run_id_list)+"\n")
+    # We print them as a compressed, comma-separated list of ranges,
+    # ready to be used with --job
+    logging.info(get_job_string(missing_run_id_list)+"\n")
