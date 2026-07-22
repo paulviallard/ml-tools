@@ -35,7 +35,7 @@ def main():
     input_file_list = sorted(glob.glob(input_pattern))
 
     # For each file,
-    for input_file in input_file_list:
+    for i, input_file in enumerate(input_file_list):
 
         logging.info(f"[{i+1}/{len(input_file_list)}]\r")
 
@@ -50,14 +50,14 @@ def main():
             filter_data=filter, all=True, squeeze=False)
 
         # we save the data in the output file
-        for i in range(len(list(path_dict.values())[0])):
+        for j in range(len(list(path_dict.values())[0])):
 
             path_dict_ = {}
             for key in path_dict.keys():
-                path_dict_[key] = path_dict[key][i]
+                path_dict_[key] = path_dict[key][j]
             data_dict_ = {}
             for key in data_dict.keys():
-                data_dict_[key] = data_dict[key][i]
+                data_dict_[key] = data_dict[key][j]
 
             output_writer.filter(data_dict_.keys(), path_dict_)
             output_writer.set(
