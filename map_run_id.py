@@ -73,7 +73,7 @@ class CollectLaunchConfig(LaunchConfig):
         if(not(self.__is_in_ignore_list(ignore_list, section, "command"))):
             reverse_run_key_list.append(("command", command))
         # We insert the parameters in the list if it is not ignored
-        for key, value in run_key_dict["param"].items():
+        for key, value in sorted(run_key_dict["param"].items()):
             if(not(self.__is_in_ignore_list(ignore_list, section, key))):
                 reverse_run_key_list.append((key, repr(value)))
 
