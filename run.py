@@ -7,6 +7,7 @@ import configparser
 import subprocess
 import logging
 import glob
+import json
 
 # Useful packages in the .ini files
 try:
@@ -470,11 +471,17 @@ class SlurmLaunchConfig(LaunchConfig):
         self.__job_id_dict[run_name] = job_id
 
     def get_job_queue_size(self):
-        result = subprocess.run("squeue -u $(whoami)",
+        # We get the name of the jobs in the queue (without the header and
+        # with a large width, otherwise the names are truncated)
+        result = subprocess.run("squeue -h -u $(whoami) -o %.100j",
             shell=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, universal_newlines=True
         )
-        job_queue_size = len(result.stdout.split("\n")[1:-1])
+        # and we only count the jobs launched by this run
+        job_name_list = [name.strip() for name in result.stdout.split("\n")]
+        job_queue_size = len([
+            name for name in job_name_list
+            if name.startswith(self.prefix_run_name)])
         return job_queue_size
 
     def _run_command(self, command, run_name=None, job_list=None):
@@ -569,11 +576,18 @@ class OarLaunchConfig(LaunchConfig):
         self.__job_id_dict[run_name] = job_id
 
     def get_job_queue_size(self):
-        result = subprocess.run("oarstat -u $(whoami)",
+        # We get the jobs in the queue (in json to have their names)
+        result = subprocess.run("oarstat -J -u $(whoami)",
             shell=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, universal_newlines=True
         )
-        job_queue_size = len(result.stdout.split("\n")[2:-1])
+        job_dict = {}
+        if(result.stdout.strip() != ""):
+            job_dict = json.loads(result.stdout)
+        # and we only count the jobs launched by this run
+        job_queue_size = len([
+            job for job in job_dict.values()
+            if str(job.get("name")).startswith(self.prefix_run_name)])
         return job_queue_size
 
     def _run_command(self, command, run_name=None, job_list=None):
