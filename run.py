@@ -450,7 +450,7 @@ class LocalLaunchConfig(LaunchConfig):
 
 ###############################################################################
 
-class SlurmLaunchConfig(LaunchConfig):
+class ClusterLaunchConfig(LaunchConfig):
 
     def __init__(self, f, job_id_list, config, queue, sleep):
         super().__init__(f, job_id_list)
@@ -458,6 +458,7 @@ class SlurmLaunchConfig(LaunchConfig):
         self.queue = queue
         self.sleep = sleep
         self.__job_id_dict = {}
+        self.__todo_list = []
 
     def get_job_id(self, run_name):
         # We get the id of a job in the dict given the job name
@@ -467,24 +468,89 @@ class SlurmLaunchConfig(LaunchConfig):
             return None
 
     def set_job_id(self, run_name, job_id):
-        # We get the id of a job in the dict given the job name
+        # We save the id of a job in the dict given the job name
         self.__job_id_dict[run_name] = job_id
 
-    def get_job_queue_size(self):
+    def run(self):
+        # We run the jobs (i.e., we execute run_command for each job)
+        super().run()
+        # and we submit them progressively
+        if(self.queue is not None):
+            self.__submit_todo_list()
+
+    def _run_command(self, command, run_name=None, job_list=None):
+        # If the queue is not limited, we directly submit the job
+        if(self.queue is None):
+            self._submit(command, run_name, job_list)
+        # Otherwise, we save it to submit it later
+        else:
+            self.__todo_list.append((command, run_name, job_list))
+
+    def __submit_todo_list(self):
+        # We keep the name of the jobs that have been submitted
+        submitted_set = set()
+
+        # While there are some jobs to submit,
+        while(len(self.__todo_list) > 0):
+
+            # We get the jobs in the queue and the ones that are finished
+            queue_set = set(self._get_queue_name_list())
+            finished_set = submitted_set - queue_set
+            queue_size = len(queue_set)
+
+            # For each job (ordered by run_id),
+            new_todo_list = []
+            for command, run_name, job_list in self.__todo_list:
+                # We keep the job if the queue is full or if some of the
+                # jobs it depends on are not finished
+                if(queue_size >= self.queue
+                   or not(set(job_list) <= finished_set)):
+                    new_todo_list.append((command, run_name, job_list))
+                    continue
+
+                # Otherwise, we submit the job
+                if(self._submit(command, run_name, [])):
+                    # and add the job in the submitted set if the
+                    # submission was successful
+                    submitted_set.add(run_name)
+                    queue_size += 1
+                else:
+                    # otherwise we add it again in the todo list
+                    new_todo_list.append((command, run_name, job_list))
+
+            self.__todo_list = new_todo_list
+
+            # We wait before rechecking the queue
+            if(len(self.__todo_list) > 0):
+                time.sleep(self.sleep)
+
+    def _get_queue_name_list(self):
+        # To be implemented!
+        raise NotImplementedError
+
+    def _submit(self, command, run_name, job_list):
+        # To be implemented!
+        raise NotImplementedError
+
+
+###############################################################################
+
+class SlurmLaunchConfig(ClusterLaunchConfig):
+
+    def _get_queue_name_list(self):
         # We get the name of the jobs in the queue (without the header and
         # with a large width, otherwise the names are truncated)
         result = subprocess.run("squeue -h -u $(whoami) -o %.100j",
             shell=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, universal_newlines=True
         )
-        # and we only count the jobs launched by this run
-        job_name_list = [name.strip() for name in result.stdout.split("\n")]
-        job_queue_size = len([
-            name for name in job_name_list
-            if name.startswith(self.prefix_run_name)])
-        return job_queue_size
+        # and we only keep the jobs launched by this run
+        name_list = [name.strip() for name in result.stdout.split("\n")]
+        return [
+            name for name in name_list
+            if name.startswith(self.prefix_run_name)]
 
-    def _run_command(self, command, run_name=None, job_list=None):
+    def _submit(self, command, run_name, job_list):
 
         # We get all the job id on which our job depends
         new_job_list = []
@@ -529,12 +595,6 @@ class SlurmLaunchConfig(LaunchConfig):
                     "There is no configuration file"
                     + f"named {self.config} for slurm")
 
-        # We put a job in the queue only if we have not reached the maximum
-        # number of jobs in the queue we have fixed
-        if(self.queue is not None):
-            while(self.get_job_queue_size() >= self.queue):
-                time.sleep(self.sleep)
-
         # We run the command to run oar
         result = subprocess.run("sbatch {} -J {} {} '{}'".format(
             dependency, run_name, config_file, command),
@@ -553,29 +613,14 @@ class SlurmLaunchConfig(LaunchConfig):
             job_id = re_match.group(0)
             self.set_job_id(run_name, int(job_id))
 
+        # We return if the submission succeeded
+        return re_match is not None
+
 ###############################################################################
 
-class OarLaunchConfig(LaunchConfig):
+class OarLaunchConfig(ClusterLaunchConfig):
 
-    def __init__(self, f, job_id_list, config, queue, sleep):
-        super().__init__(f, job_id_list)
-        self.config = config
-        self.queue = queue
-        self.sleep = sleep
-        self.__job_id_dict = {}
-
-    def get_job_id(self, run_name):
-        # We get the id of a job in the dict given the job name
-        try:
-            return self.__job_id_dict[run_name]
-        except KeyError:
-            return None
-
-    def set_job_id(self, run_name, job_id):
-        # We get the id of a job in the dict given the job name
-        self.__job_id_dict[run_name] = job_id
-
-    def get_job_queue_size(self):
+    def _get_queue_name_list(self):
         # We get the jobs in the queue (in json to have their names)
         result = subprocess.run("oarstat -J -u $(whoami)",
             shell=True, stdout=subprocess.PIPE,
@@ -584,13 +629,13 @@ class OarLaunchConfig(LaunchConfig):
         job_dict = {}
         if(result.stdout.strip() != ""):
             job_dict = json.loads(result.stdout)
-        # and we only count the jobs launched by this run
-        job_queue_size = len([
-            job for job in job_dict.values()
-            if str(job.get("name")).startswith(self.prefix_run_name)])
-        return job_queue_size
+        # and we only keep the jobs launched by this run
+        name_list = [str(job.get("name")) for job in job_dict.values()]
+        return [
+            name for name in name_list
+            if name.startswith(self.prefix_run_name)]
 
-    def _run_command(self, command, run_name=None, job_list=None):
+    def _submit(self, command, run_name, job_list):
 
         # We get all the job id on which our job depends
         new_job_list = []
@@ -632,12 +677,6 @@ class OarLaunchConfig(LaunchConfig):
                     "There is no configuration file"
                     + f"named {self.config} for oar")
 
-        # We put a job in the queue only if we have not attained the maximum
-        # number of jobs in the queue we have fixed
-        if(self.queue is not None):
-            while(self.get_job_queue_size() >= self.queue):
-                time.sleep(self.sleep)
-
         # We run the command to run oar
         result = subprocess.run("oarsub {} -n {} -S '{} {}'".format(
             dependency, run_name, config_file, command),
@@ -655,6 +694,9 @@ class OarLaunchConfig(LaunchConfig):
         if(re_match):
             job_id = re_match.group(1)
             self.set_job_id(run_name, int(job_id))
+
+        # We return if the submission succeeded
+        return re_match is not None
 
 ###############################################################################
 
