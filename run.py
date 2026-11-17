@@ -19,6 +19,32 @@ import math
 ###############################################################################
 
 
+def get_job_string(run_id_list):
+    # We compress the consecutive run_id into ranges, to build a string
+    # usable with run.py's --job option (e.g. "1,3,5:8")
+    run_id_list = sorted(run_id_list)
+
+    # We split the run_id into (start, end) ranges of consecutive values
+    range_list = []
+    for run_id in run_id_list:
+        if(len(range_list) > 0 and run_id == range_list[-1][1]+1):
+            range_list[-1][1] = run_id
+        else:
+            range_list.append([run_id, run_id])
+
+    # We turn each range into a string: a single run_id, or "start:end"
+    str_list = []
+    for start, end in range_list:
+        if(start == end):
+            str_list.append(str(start))
+        else:
+            str_list.append(f"{start}:{end}")
+    return ",".join(str_list)
+
+
+###############################################################################
+
+
 class LaunchConfig():
 
     def __init__(self, f, job_id_list):
@@ -427,9 +453,12 @@ class LaunchConfig():
 class PrintLaunchConfig(LaunchConfig):
 
     def _run_command(self, command, run_name=None, dependency=None):
-        # We create the message
-        msg = "Job: {}".format(run_name)
-        msg += " - Dependency: {}".format(", ".join(dependency))
+        # We create the message (with the run_id instead of the run name,
+        # and with the compressed dependencies, e.g., "1:3,6")
+        run_id = int(run_name.split("_")[-1])
+        dependency_id_list = [int(name.split("_")[-1]) for name in dependency]
+        msg = "Job: {}".format(run_id)
+        msg += " - Dependency: {}".format(get_job_string(dependency_id_list))
 
         # We print the message
         logging.info(msg+"\n")

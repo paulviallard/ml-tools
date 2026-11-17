@@ -11,8 +11,7 @@ except ImportError:
 import math
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from run import LaunchConfig
-from check_run_id import get_job_string
+from run import LaunchConfig, get_job_string
 
 ###############################################################################
 
