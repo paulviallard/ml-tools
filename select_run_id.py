@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import argparse
 import logging
@@ -9,6 +10,8 @@ try:
 except ImportError:
     pass
 import math
+import glob
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from run import LaunchConfig, get_job_string
@@ -49,6 +52,11 @@ def get_run_dict(config_file):
 
 
 def get_selected_run_id_list(run_dict, constraint):
+    # We get the name of the parameters of all the runs
+    param_name_set = set()
+    for param in run_dict.values():
+        param_name_set.update(param.keys())
+
     # We keep the run_id whose parameters satisfy the constraint
     selected_run_id_list = []
     for run_id, param in sorted(run_dict.items()):
@@ -57,7 +65,14 @@ def get_selected_run_id_list(run_dict, constraint):
             is_selected = eval(constraint, {**globals(), **param})
         # If the run does not have a parameter used in the constraint
         # (e.g., it comes from another section), it is not selected
-        except NameError:
+        # (any other unknown name is an error, e.g., a typo)
+        except NameError as error:
+            # (we get the unknown name from the message of the error, since
+            # error.name does not exist in the old versions of Python)
+            unknown_name = re.search(r"name '(.*)' is not defined", str(error))
+            if(unknown_name is None
+               or unknown_name.group(1) not in param_name_set):
+                raise
             is_selected = False
         if(is_selected):
             selected_run_id_list.append(run_id)
