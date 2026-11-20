@@ -42,6 +42,11 @@ def get_job_string(run_id_list):
     return ",".join(str_list)
 
 
+def get_sorted_run_name_list(run_name_set):
+    # We sort the run names by run_id (i.e., the number at the end of the name)
+    return sorted(run_name_set, key=lambda x: int(x.split('_')[-1]))
+
+
 ###############################################################################
 
 
@@ -303,11 +308,10 @@ class LaunchConfig():
         param_list, todo_param_list = self._get_param_list(
             param_list, known_param)
 
-        # We initialize a list of run dependencies
-        known_dependency = sorted(
-            list(set(known_dependency)),
-            key=lambda x: int(x.split('_')[-1]))
-        dependency_1 = list(known_dependency)
+        # We initialize the run dependencies (we use a set to add the new
+        # ones quickly, and we only sort them when it is needed)
+        known_dependency = get_sorted_run_name_list(known_dependency)
+        dependency_1 = set(known_dependency)
 
         # For each combination of params
         for param in itertools.product(*param_list.values()):
@@ -346,11 +350,8 @@ class LaunchConfig():
                     job_subtree, todo_param_list, known_param_,
                     known_var, known_dependency)
 
-                # We add the dependencies of the recursion in the list
-                dependency_1 = sorted(
-                    list(set(dependency_1 + dependency_)),
-                    key=lambda x: int(x.split('_')[-1])
-                )
+                # We add the dependencies of the recursion in the set
+                dependency_1.update(dependency_)
 
                 continue
 
@@ -405,43 +406,37 @@ class LaunchConfig():
                     job_subtree, job_subtree[2], param_,
                     var_, new_known_dependency)
 
-                # We add the new dependencies in the list
-                dependency_1 = sorted(
-                    list(set(dependency_1 + dependency_)),
-                    key=lambda x: int(x.split('_')[-1]))
+                # We add the new dependencies in the set
+                dependency_1.update(dependency_)
 
             # We add our current run in the (first) dependency list if the job
             # id is in the list (and if the command exists)
             if((self.job_id_list is None
                or self.__run_index in self.job_id_list)
                and command is not None):
-                dependency_1.append(run_name)
-                dependency_1 = sorted(
-                    list(set(dependency_1)),
-                    key=lambda x: int(x.split('_')[-1]))
+                dependency_1.add(run_name)
 
             # If we are in sequential mode, then, we need to update
             # the known dependency and run sequentially the jobs inside a node
             if(job_tree[5] is True):
-                known_dependency = dependency_1
+                known_dependency = get_sorted_run_name_list(dependency_1)
 
-        # We create a second (and final) dependency list
-        dependency_2 = list(dependency_1)
+        # We create a second (and final) dependency set
+        dependency_2 = set(dependency_1)
 
         # For each subtree (of type "[sth1 |-> sth2]")
+        sorted_dependency_1 = get_sorted_run_name_list(dependency_1)
         for job_subtree in job_tree[4]:
 
             # We run recursively the subtree (and we get the dependency)
             dependency_ = self._run(
                 job_subtree, job_subtree[2],
-                known_param, known_var, dependency_1)
-            # We add the new dependencies in the list
-            dependency_2 = sorted(
-                list(set(dependency_2 + dependency_)),
-                key=lambda x: int(x.split('_')[-1]))
+                known_param, known_var, sorted_dependency_1)
+            # We add the new dependencies in the set
+            dependency_2.update(dependency_)
 
         # We return the dependencies of the node
-        return dependency_2
+        return get_sorted_run_name_list(dependency_2)
 
     def _run_command(self, command, run_name=None, job_list=None):
         # To be implemented!
