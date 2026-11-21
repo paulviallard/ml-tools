@@ -10,9 +10,11 @@ import pandas as pd
 
 class Writer():
 
-    def __init__(self, file_):
+    def __init__(self, file_, compression="gzip"):
         # We save the path associated with the data
         self._path_file = os.path.abspath(file_)
+        # and the compression of the datasets (None means no compression)
+        self._compression = compression
 
     # ----------------------------------------------------------------------- #
 
@@ -100,18 +102,24 @@ class Writer():
                 # We set the data in the hdf5 file
                 if(mode == "w" or mode == "r"):
                     group.create_dataset(
-                        key, data=data_dict[key])
+                        key, data=data_dict[key],
+                        compression=self.__get_compression(
+                            self.__getshape(data_dict[key])))
                 elif(mode == "a"):
                     # If we are in the mode "a", we need first to get the
                     # shape of the data to set maxshape and we set the data
                     shape_list = list(self.__getshape(data_dict[key]))
+                    compression = self.__get_compression(shape_list)
                     if(len(shape_list) > 0):
                         shape_list[0] = None
                         group.create_dataset(
-                            key, maxshape=shape_list, data=data_dict[key])
+                            key, maxshape=shape_list, data=data_dict[key],
+                            compression=compression)
                     else:
+                        # (a single value becomes a dataset with one element)
                         group.create_dataset(
-                            key, maxshape=[None], data=[data_dict[key]])
+                            key, maxshape=[None], data=[data_dict[key]],
+                            compression=self.__get_compression([1]))
                 else:
                     # We raise an error and close the data
                     self._close()
@@ -147,6 +155,13 @@ class Writer():
         except Exception as e:
             # Normally, this must never happen
             return None
+
+    def __get_compression(self, shape):
+        # We do not compress the scalars and the empty datasets (they cannot
+        # be compressed)
+        if(shape is None or len(shape) == 0 or 0 in shape):
+            return None
+        return self._compression
 
     # ----------------------------------------------------------------------- #
 
