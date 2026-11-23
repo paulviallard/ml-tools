@@ -311,10 +311,13 @@ class LaunchConfig():
 
     def _is_selected(self, run_id, meta_id):
         # We check if the job is in the list
-        if(self.job_id_list is None or run_id in self.job_id_list):
+        if(self.job_id_list is None
+           or run_id in self.job_id_list
+           or meta_id in self.job_id_list):
             return True
-        for i in range(1, len(meta_id)+1):
-            if(meta_id[:i] in self.job_id_list):
+        # or if it is below a meta_id of the list
+        for i in range(1, len(meta_id)):
+            if(meta_id[:i]+("-",) in self.job_id_list):
                 return True
         return False
 
@@ -819,11 +822,20 @@ if __name__ == "__main__":
                 if(":" in job_range):
                     arg_parser.error(
                         "--job: a meta_id cannot be in a range")
+                meta_id = job_range[1:].split("-")
+                # (if it ends with "-", it selects the jobs below it)
+                is_below = (meta_id[-1] == "")
+                if(is_below):
+                    meta_id.pop()
                 try:
-                    meta_id = [int(r) for r in job_range[1:].split("-")]
+                    meta_id = tuple([int(r) for r in meta_id])
                 except ValueError:
                     arg_parser.error("--job: these are not valid job ids")
-                job_id_list.append(tuple(meta_id))
+                if(len(meta_id) == 0):
+                    arg_parser.error("--job: these are not valid job ids")
+                if(is_below):
+                    meta_id = meta_id+("-",)
+                job_id_list.append(meta_id)
 
             # Otherwise, it is a run_id (or a range of run_id)
             else:
