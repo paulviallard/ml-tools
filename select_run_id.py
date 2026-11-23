@@ -43,21 +43,13 @@ class CollectLaunchConfig(LaunchConfig):
 ###############################################################################
 
 
-def get_run_dict(config_file):
-    # We get, for a given .ini file, the dict associating each run_id to
-    # its parameters
-    config = CollectLaunchConfig(config_file)
-    config.run()
-    return config.get_run_dict()
-
-
 def get_selected_run_id_list(run_dict, constraint):
     # We get the name of the parameters of all the runs
     param_name_set = set()
     for param in run_dict.values():
         param_name_set.update(param.keys())
 
-    # We keep the run_id whose parameters satisfy the constraint
+    # We keep the run id whose parameters satisfy the constraint
     selected_run_id_list = []
     for run_id, param in sorted(run_dict.items()):
         # We evaluate the constraint with the parameters as variables
@@ -77,6 +69,71 @@ def get_selected_run_id_list(run_dict, constraint):
         if(is_selected):
             selected_run_id_list.append(run_id)
     return selected_run_id_list
+
+
+def convert_run_id_list(config, selected_run_id_list):
+    # We get the runs of each meta_id and of each of its prefixes
+    meta_id_dict = {}
+    for run_id in config.get_run_dict():
+        meta_id = config.get_meta_id(run_id)
+        # For each level of the meta id,
+        for i in range(1, len(meta_id)+1):
+            # we add the run id 
+            sub_meta_id = meta_id[:i]
+            if(i < len(meta_id)):
+                sub_meta_id = sub_meta_id+("-",)
+            if(sub_meta_id not in meta_id_dict):
+                meta_id_dict[sub_meta_id] = []
+            meta_id_dict[sub_meta_id].append(run_id)
+
+    # We get the same dict for the selected runs (and the list of the
+    # prefixes and the meta_id of each selected run)
+    selected_meta_id_dict = {}
+    meta_id_list_dict = {}
+    for run_id in selected_run_id_list:
+        meta_id = config.get_meta_id(run_id)
+        meta_id_list_dict[run_id] = []
+        # For each level of the meta id,
+        for i in range(1, len(meta_id)+1):
+            # we add the run id
+            sub_meta_id = meta_id[:i]
+            if(i < len(meta_id)):
+                sub_meta_id = sub_meta_id+("-",)
+            meta_id_list_dict[run_id].append(sub_meta_id)
+            if(sub_meta_id not in selected_meta_id_dict):
+                selected_meta_id_dict[sub_meta_id] = []
+            selected_meta_id_dict[sub_meta_id].append(run_id)
+
+    # We simplify the meta_id
+    meta_id_list = []
+    # For each selected run,
+    for run_id in selected_run_id_list:
+        # we look at its meta_id and its prefixes
+        for sub_meta_id in meta_id_list_dict[run_id]:
+            # If all the runs of this meta_id are selected
+            if(len(selected_meta_id_dict[sub_meta_id])
+               == len(meta_id_dict[sub_meta_id])):
+                # we keep it
+                if(sub_meta_id not in meta_id_list):
+                    meta_id_list.append(sub_meta_id)
+                break
+    return meta_id_list
+
+
+def get_meta_string(meta_id_list):
+    # We create the string of each meta id
+    meta_string_list = []
+    for meta_id in meta_id_list:
+        if(meta_id[-1] == "-"):
+            index_list = meta_id[:-1]
+        else:
+            index_list = meta_id
+        meta_string = "-"+"-".join([str(index) for index in index_list])
+        if(meta_id[-1] == "-"):
+            meta_string += "-"
+        meta_string_list.append(meta_string)
+
+    return ",".join(meta_string_list)
 
 
 ###############################################################################
@@ -102,12 +159,16 @@ if __name__ == "__main__":
     arg_list = arg_parser.parse_args()
 
     # We get the parameters of each run_id described in the .ini file
-    run_dict = get_run_dict(arg_list.path)
+    config = CollectLaunchConfig(arg_list.path)
+    config.run()
+    run_dict = config.get_run_dict()
 
     # We keep the run_id satisfying the constraint
     selected_run_id_list = get_selected_run_id_list(
         run_dict, arg_list.constraint)
+    selected_meta_id_list = convert_run_id_list(config, selected_run_id_list)
 
     # We print them as a compressed, comma-separated list of ranges,
     # ready to be used with --job
     logging.info(get_job_string(selected_run_id_list)+"\n")
+    logging.info(get_meta_string(selected_meta_id_list)+"\n")
