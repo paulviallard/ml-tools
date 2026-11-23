@@ -59,6 +59,9 @@ class LaunchConfig():
         # We save the ids of the jobs to execute
         self.job_id_list = job_id_list
 
+        # We create the correspondence between the run_id and the meta_id
+        self.meta_dict = {}
+
         # We read the configuration file (.ini)
         config = configparser.ConfigParser(empty_lines_in_values=False)
         config.read(f)
@@ -291,15 +294,43 @@ class LaunchConfig():
             command = command.replace(var_name, var_list[var_name])
         return command
 
+    def get_meta_id(self, run_id, is_str=False):
+        # We get the meta_id of a run_id
+        meta_id = self.meta_dict[run_id]
+        if(is_str):
+            return "-"+"-".join([str(index) for index in meta_id])
+        return meta_id
+
+    def get_run_id(self, meta_id, is_str=False):
+        # We get the run_id of a meta_id
+        if(is_str):
+            if(not(meta_id.startswith("-"))):
+                raise ValueError("A meta_id must start with -")
+            meta_id = tuple([int(index) for index in meta_id[1:].split("-")])
+        return self.meta_dict[meta_id]
+
+    def _is_selected(self, run_id, meta_id):
+        # We check if the job is in the list
+        if(self.job_id_list is None or run_id in self.job_id_list):
+            return True
+        for i in range(1, len(meta_id)+1):
+            if(meta_id[:i] in self.job_id_list):
+                return True
+        return False
+
     def run(self):
         # We initialize a run index (useful for slurm, oar ...)
         self.__run_index = 0
-        # We run the jobs of the subtrees
+        self.meta_dict = {}
+        # We run the jobs of the subtrees (the last value of the meta_id is
+        # the count of the runs of their node)
+        known_meta_id = [0]
         for prog_subtree in self.job_tree[3]:
-            self._run(prog_subtree, prog_subtree[2], {}, {}, [])
+            self._run(
+                prog_subtree, prog_subtree[2], {}, {}, [], known_meta_id)
 
     def _run(self, job_tree, param_list,
-             known_param, known_var, known_dependency):
+             known_param, known_var, known_dependency, known_meta_id):
 
         # We keep the old parameters to check if there is a problem
         old_param_list = param_list
@@ -348,7 +379,7 @@ class LaunchConfig():
                 # parameters (to run the new loops ...)
                 dependency_ = self._run(
                     job_subtree, todo_param_list, known_param_,
-                    known_var, known_dependency)
+                    known_var, known_dependency, known_meta_id)
 
                 # We add the dependencies of the recursion in the set
                 dependency_1.update(dependency_)
@@ -360,9 +391,17 @@ class LaunchConfig():
             # We create a name of this run
             run_name = self.prefix_run_name+str(self.__run_index)
 
+            # We create the meta_id of this run
+            known_meta_id[-1] += 1
+            meta_id = tuple(known_meta_id)
+
+            # We check if the job is in the list before running the subtrees
+            is_selected = self._is_selected(self.__run_index, meta_id)
+
             # We update our params for a given run
             param_ = dict(known_param)
             param_["run_id"] = self.__run_index
+            param_["meta_id"] = "-"+"-".join([str(i) for i in meta_id])
             param_["job_id"] = int(self.prefix_run_name[4:-1])
             param_.update(dict(zip(param_list.keys(), param)))
 
@@ -375,12 +414,15 @@ class LaunchConfig():
 
             # If the command exists
             if(command is not None):
+                # We save the correspondence between the run_id and meta_id
+                self.meta_dict[self.__run_index] = meta_id
+                self.meta_dict[meta_id] = self.__run_index
+
                 # We interpret the command (with the variables)
                 command = self._construct_command(command, var_)
 
                 # We run the command if the job id is in the list
-                if(self.job_id_list is None
-                   or self.__run_index in self.job_id_list):
+                if(is_selected):
                     self._run_command(command, run_name, known_dependency)
 
             # Otherwise, if the command does not exist,
@@ -389,14 +431,13 @@ class LaunchConfig():
                 self.__run_index -= 1
 
             # For each subtree (of type "[-> sth]" or "[sth1 -> sth2]")
+            child_meta_id = list(meta_id)+[0]
             for job_subtree in job_tree[3]:
 
                 # We update the dependencies: if the id is in the list
                 # (and if the command exists), we add
                 # the job id in the dependencies
-                if((self.job_id_list is None
-                   or self.__run_index in self.job_id_list)
-                   and command is not None):
+                if(is_selected and command is not None):
                     new_known_dependency = known_dependency+[run_name]
                 else:
                     new_known_dependency = known_dependency
@@ -404,16 +445,14 @@ class LaunchConfig():
                 # We run recursively the subtree (and we get the dependency)
                 dependency_ = self._run(
                     job_subtree, job_subtree[2], param_,
-                    var_, new_known_dependency)
+                    var_, new_known_dependency, child_meta_id)
 
                 # We add the new dependencies in the set
                 dependency_1.update(dependency_)
 
             # We add our current run in the (first) dependency list if the job
             # id is in the list (and if the command exists)
-            if((self.job_id_list is None
-               or self.__run_index in self.job_id_list)
-               and command is not None):
+            if(is_selected and command is not None):
                 dependency_1.add(run_name)
 
             # If we are in sequential mode, then, we need to update
@@ -431,7 +470,7 @@ class LaunchConfig():
             # We run recursively the subtree (and we get the dependency)
             dependency_ = self._run(
                 job_subtree, job_subtree[2],
-                known_param, known_var, sorted_dependency_1)
+                known_param, known_var, sorted_dependency_1, known_meta_id)
             # We add the new dependencies in the set
             dependency_2.update(dependency_)
 
@@ -775,24 +814,34 @@ if __name__ == "__main__":
         job_range_list = job.split(",")
         for job_range in job_range_list:
 
-            # We get the ids in the "range"
-            try:
-                job_range = job_range.split(":")
-                job_range = sorted([int(r) for r in job_range])
-            except ValueError:
-                arg_parser.error("--job: these are not valid job ids")
+            # If it is a meta_id, we add it in the list
+            if(job_range.startswith("-")):
+                if(":" in job_range):
+                    arg_parser.error(
+                        "--job: a meta_id cannot be in a range")
+                try:
+                    meta_id = [int(r) for r in job_range[1:].split("-")]
+                except ValueError:
+                    arg_parser.error("--job: these are not valid job ids")
+                job_id_list.append(tuple(meta_id))
 
-            if(len(job_range) > 2):
-                arg_parser.error(
-                    "--job: a range must contain 2 values only")
+            # Otherwise, it is a run_id (or a range of run_id)
+            else:
+                # We get the ids in the "range"
+                try:
+                    job_range = job_range.split(":")
+                    job_range = sorted([int(r) for r in job_range])
+                except ValueError:
+                    arg_parser.error("--job: these are not valid job ids")
 
-            # We add all the ids in the list
-            if(len(job_range) == 2):
-                job_range = list(range(job_range[0], job_range[1]+1))
-            job_id_list = job_id_list+job_range
+                if(len(job_range) > 2):
+                    arg_parser.error(
+                        "--job: a range must contain 2 values only")
 
-        # We sort the list
-        job_id_list = sorted(job_id_list)
+                # We add all the ids in the list
+                if(len(job_range) == 2):
+                    job_range = list(range(job_range[0], job_range[1]+1))
+                job_id_list = job_id_list+job_range
 
     if(mode != "print" and mode != "local"
        and mode != "slurm" and mode != "oar"
