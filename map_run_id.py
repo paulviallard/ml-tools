@@ -42,6 +42,7 @@ class CollectLaunchConfig(LaunchConfig):
         # the name of the section in the dict
         run_id = self.__param["run_id"]
         del self.__param["run_id"]
+        del self.__param["meta_id"]
         del self.__param["job_id"]
         self.__run_dict[run_id] = {
             "param": self.__param,
@@ -93,14 +94,6 @@ class CollectLaunchConfig(LaunchConfig):
         return reverse_run_dict
 
 ###############################################################################
-
-
-def get_reverse_run_dict(config_file, ignore_list):
-    # We get, for a given .ini file, the dict associating each run
-    # signature (command, parameters) to the run_id sharing it
-    config = CollectLaunchConfig(config_file)
-    config.run()
-    return config.get_reverse_run_dict(ignore_list)
 
 
 def parse_ignore(ignore_string):
@@ -157,13 +150,16 @@ def get_mapping_dict(input_reverse_run_dict, output_reverse_run_dict):
     return mapping_dict
 
 
-def generate_cmd_list(mapping, command):
+def generate_cmd_list(mapping, command, input_config, output_config):
     # We build the command to run for each mapped run, by substituting
-    # {input_run_id}/{output_run_id} in the command
+    # {input_run_id}/{output_run_id} and {input_meta_id}/{output_meta_id}
+    # in the command
     cmd_list = []
     for input_run_id, output_run_id in sorted(mapping.items()):
         cmd_list.append(command.format(
-            input_run_id=input_run_id, output_run_id=output_run_id))
+            input_run_id=input_run_id, output_run_id=output_run_id,
+            input_meta_id=input_config.get_meta_id(input_run_id, True),
+            output_meta_id=output_config.get_meta_id(output_run_id, True)))
     return cmd_list
 
 
@@ -189,7 +185,8 @@ if __name__ == "__main__":
         help="The ini file whose run_id we want to adopt")
     arg_parser.add_argument(
         "command", metavar="command", type=str,
-        help="The command to run, with {input_run_id} and {output_run_id}")
+        help="The command to run, with {input_run_id}, {output_run_id}, "
+             "{input_meta_id} and {output_meta_id}")
 
     arg_parser.add_argument(
         "--ignore", metavar="ignore", default="", type=str,
@@ -203,17 +200,22 @@ if __name__ == "__main__":
     # We parse the --ignore option
     ignore_list = parse_ignore(arg_list.ignore)
 
+    # We get the runs of both files
+    input_config = CollectLaunchConfig(arg_list.input_file)
+    input_config.run()
+    output_config = CollectLaunchConfig(arg_list.output_file)
+    output_config.run()
+
     # We get the reverse run dictionary (run signature -> run_id) of both files
-    input_reverse_run_dict = get_reverse_run_dict(
-        arg_list.input_file, ignore_list)
-    output_reverse_run_dict = get_reverse_run_dict(
-        arg_list.output_file, ignore_list)
+    input_reverse_run_dict = input_config.get_reverse_run_dict(ignore_list)
+    output_reverse_run_dict = output_config.get_reverse_run_dict(ignore_list)
 
     # We match the runs of both files to get the run_id -> run_id mapping
     mapping = get_mapping_dict(input_reverse_run_dict, output_reverse_run_dict)
 
     # We turn the mapping into the list of commands to run
-    cmd_list = generate_cmd_list(mapping, arg_list.command)
+    cmd_list = generate_cmd_list(
+        mapping, arg_list.command, input_config, output_config)
 
     # For each command,
     for cmd in cmd_list:
