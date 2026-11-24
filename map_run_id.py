@@ -42,7 +42,7 @@ class CollectLaunchConfig(LaunchConfig):
         # the name of the section in the dict
         run_id = self.__param["run_id"]
         del self.__param["run_id"]
-        del self.__param["meta_id"]
+        del self.__param["tree_id"]
         del self.__param["job_id"]
         self.__run_dict[run_id] = {
             "param": self.__param,
@@ -152,14 +152,14 @@ def get_mapping_dict(input_reverse_run_dict, output_reverse_run_dict):
 
 def generate_cmd_list(mapping, command, input_config, output_config):
     # We build the command to run for each mapped run, by substituting
-    # {input_run_id}/{output_run_id} and {input_meta_id}/{output_meta_id}
+    # {input_run_id}/{output_run_id} and {input_tree_id}/{output_tree_id}
     # in the command
     cmd_list = []
     for input_run_id, output_run_id in sorted(mapping.items()):
         cmd_list.append(command.format(
             input_run_id=input_run_id, output_run_id=output_run_id,
-            input_meta_id=input_config.get_meta_id(input_run_id, True),
-            output_meta_id=output_config.get_meta_id(output_run_id, True)))
+            input_tree_id=input_config.get_tree_id(input_run_id, True),
+            output_tree_id=output_config.get_tree_id(output_run_id, True)))
     return cmd_list
 
 
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "command", metavar="command", type=str,
         help="The command to run, with {input_run_id}, {output_run_id}, "
-             "{input_meta_id} and {output_meta_id}")
+             "{input_tree_id} and {output_tree_id}")
 
     arg_parser.add_argument(
         "--ignore", metavar="ignore", default="", type=str,

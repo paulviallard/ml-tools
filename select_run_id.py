@@ -72,68 +72,68 @@ def get_selected_run_id_list(run_dict, constraint):
 
 
 def convert_run_id_list(config, selected_run_id_list):
-    # We get the runs of each meta_id and of each of its prefixes
-    meta_id_dict = {}
+    # We get the runs of each tree_id and of each of its prefixes
+    tree_id_dict = {}
     for run_id in config.get_run_dict():
-        meta_id = config.get_meta_id(run_id)
-        # For each level of the meta id,
-        for i in range(1, len(meta_id)+1):
+        tree_id = config.get_tree_id(run_id)
+        # For each level of the tree id,
+        for i in range(1, len(tree_id)+1):
             # we add the run id 
-            sub_meta_id = meta_id[:i]
-            if(i < len(meta_id)):
-                sub_meta_id = sub_meta_id+("-",)
-            if(sub_meta_id not in meta_id_dict):
-                meta_id_dict[sub_meta_id] = []
-            meta_id_dict[sub_meta_id].append(run_id)
+            sub_tree_id = tree_id[:i]
+            if(i < len(tree_id)):
+                sub_tree_id = sub_tree_id+("-",)
+            if(sub_tree_id not in tree_id_dict):
+                tree_id_dict[sub_tree_id] = []
+            tree_id_dict[sub_tree_id].append(run_id)
 
     # We get the same dict for the selected runs (and the list of the
-    # prefixes and the meta_id of each selected run)
-    selected_meta_id_dict = {}
-    meta_id_list_dict = {}
+    # prefixes and the tree_id of each selected run)
+    selected_tree_id_dict = {}
+    tree_id_list_dict = {}
     for run_id in selected_run_id_list:
-        meta_id = config.get_meta_id(run_id)
-        meta_id_list_dict[run_id] = []
-        # For each level of the meta id,
-        for i in range(1, len(meta_id)+1):
+        tree_id = config.get_tree_id(run_id)
+        tree_id_list_dict[run_id] = []
+        # For each level of the tree id,
+        for i in range(1, len(tree_id)+1):
             # we add the run id
-            sub_meta_id = meta_id[:i]
-            if(i < len(meta_id)):
-                sub_meta_id = sub_meta_id+("-",)
-            meta_id_list_dict[run_id].append(sub_meta_id)
-            if(sub_meta_id not in selected_meta_id_dict):
-                selected_meta_id_dict[sub_meta_id] = []
-            selected_meta_id_dict[sub_meta_id].append(run_id)
+            sub_tree_id = tree_id[:i]
+            if(i < len(tree_id)):
+                sub_tree_id = sub_tree_id+("-",)
+            tree_id_list_dict[run_id].append(sub_tree_id)
+            if(sub_tree_id not in selected_tree_id_dict):
+                selected_tree_id_dict[sub_tree_id] = []
+            selected_tree_id_dict[sub_tree_id].append(run_id)
 
-    # We simplify the meta_id
-    meta_id_list = []
+    # We simplify the tree_id
+    tree_id_list = []
     # For each selected run,
     for run_id in selected_run_id_list:
-        # we look at its meta_id and its prefixes
-        for sub_meta_id in meta_id_list_dict[run_id]:
-            # If all the runs of this meta_id are selected
-            if(len(selected_meta_id_dict[sub_meta_id])
-               == len(meta_id_dict[sub_meta_id])):
+        # we look at its tree_id and its prefixes
+        for sub_tree_id in tree_id_list_dict[run_id]:
+            # If all the runs of this tree_id are selected
+            if(len(selected_tree_id_dict[sub_tree_id])
+               == len(tree_id_dict[sub_tree_id])):
                 # we keep it
-                if(sub_meta_id not in meta_id_list):
-                    meta_id_list.append(sub_meta_id)
+                if(sub_tree_id not in tree_id_list):
+                    tree_id_list.append(sub_tree_id)
                 break
-    return meta_id_list
+    return tree_id_list
 
 
-def get_meta_string(meta_id_list):
-    # We create the string of each meta id
-    meta_string_list = []
-    for meta_id in meta_id_list:
-        if(meta_id[-1] == "-"):
-            index_list = meta_id[:-1]
+def get_tree_string(tree_id_list):
+    # We create the string of each tree id
+    tree_string_list = []
+    for tree_id in tree_id_list:
+        if(tree_id[-1] == "-"):
+            index_list = tree_id[:-1]
         else:
-            index_list = meta_id
-        meta_string = "-"+"-".join([str(index) for index in index_list])
-        if(meta_id[-1] == "-"):
-            meta_string += "-"
-        meta_string_list.append(meta_string)
+            index_list = tree_id
+        tree_string = "-"+"-".join([str(index) for index in index_list])
+        if(tree_id[-1] == "-"):
+            tree_string += "-"
+        tree_string_list.append(tree_string)
 
-    return ",".join(meta_string_list)
+    return ",".join(tree_string_list)
 
 
 ###############################################################################
@@ -166,9 +166,9 @@ if __name__ == "__main__":
     # We keep the run_id satisfying the constraint
     selected_run_id_list = get_selected_run_id_list(
         run_dict, arg_list.constraint)
-    selected_meta_id_list = convert_run_id_list(config, selected_run_id_list)
+    selected_tree_id_list = convert_run_id_list(config, selected_run_id_list)
 
     # We print them as a compressed, comma-separated list of ranges,
     # ready to be used with --job
     logging.info(get_job_string(selected_run_id_list)+"\n")
-    logging.info(get_meta_string(selected_meta_id_list)+"\n")
+    logging.info(get_tree_string(selected_tree_id_list)+"\n")
